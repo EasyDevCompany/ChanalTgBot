@@ -47,7 +47,7 @@ def get_weather():
                 'lang': 'ru',
                 'units': 'metric',
                 'APPID': os.getenv('WEATHER_API_KEY')
-                })
+                }, headers=headers)
         result = response.json()
         today = int(datetime.datetime.now().strftime('%d'))
         for i in result['list']:
@@ -81,7 +81,8 @@ def get_horoscope():
     for sign in signs.items():
         try:
             response = requests.get(
-                f'https://horo.mail.ru/prediction/{sign[0]}/today/')
+                f'https://horo.mail.ru/prediction/{sign[0]}/today/',
+                headers=headers)
             result = response.content
             soup = BeautifulSoup(result, 'lxml')
             horoscope_text = soup.find(
@@ -91,3 +92,19 @@ def get_horoscope():
         except Exception as e:
             horoscope['Exception horoscope'] = e
     return horoscope
+
+
+def get_holidays():
+    holidays = []
+    try:
+        response = requests.get('https://my-calend.ru/holidays',
+                                headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        holidays_list = soup.find('ul', class_='holidays-items').find_all('li')
+        for holiday in holidays_list:
+            holiday = holiday.text[:-5]
+            holidays.append(holiday)
+    except Exception as e:
+        holidays.append(f'Error {e}')
+    return holidays

@@ -1,7 +1,8 @@
 from create_bot import bot
 from aiogram import Dispatcher, types
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from parsing import get_urgent_information, get_horoscope, get_weather
+from parsing import (get_urgent_information, get_horoscope, get_weather,
+                     get_holidays)
 
 
 scheduler = AsyncIOScheduler(timezone='UTC')
@@ -28,6 +29,12 @@ async def send_forecast(id):
         await bot.send_message(id, forecast)
 
 
+async def send_holidays(id):
+    holidays = get_holidays()
+    for holiday in holidays:
+        await bot.send_message(id, holiday)
+
+
 async def start(message: types.Message):
     bot_obj = await bot.get_me()
     bot_id = bot_obj.id
@@ -39,6 +46,7 @@ async def start(message: types.Message):
                       args=[message.chat.id], hour=4, minute=45)
     scheduler.add_job(send_forecast, 'cron', args=[message.chat.id],
                       hour=4, minute=30)
+    scheduler.add_job(send_holidays, 'cron', args=[message.chat.id], hour=6)
 
 
 def register(dp: Dispatcher):
