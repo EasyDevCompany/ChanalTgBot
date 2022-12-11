@@ -1,10 +1,10 @@
 from create_bot import bot
 from aiogram import Dispatcher, types
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from parsing import (get_urgent_information, get_horoscope, get_weather,
+from parsing import (get_urgent_information, get_horoscope, get_weather_today,
                      get_holidays, check_update_urgent_information,
                      check_update_newbryansk, check_update_ria,
-                     check_update_bga, check_update_bo)
+                     check_update_bga, check_update_bo, get_weather_tomorrow)
 
 
 scheduler = AsyncIOScheduler(timezone='UTC')
@@ -25,8 +25,14 @@ async def send_horoscope(id):
                                parse_mode='HTML')
 
 
-async def send_forecast(id):
-    forecasts = get_weather()
+async def send_forecast_today(id):
+    forecasts = get_weather_today()
+    for forecast in forecasts:
+        await bot.send_message(id, forecast)
+
+
+async def send_forecast_tomorrow(id):
+    forecasts = get_weather_tomorrow()
     for forecast in forecasts:
         await bot.send_message(id, forecast)
 
@@ -91,7 +97,7 @@ async def start(message: types.Message):
     scheduler.add_job(send_urgent_info, 'cron', args=[message.chat.id], hour=4)
     scheduler.add_job(send_horoscope, 'cron',
                       args=[message.chat.id], hour=4, minute=45)
-    scheduler.add_job(send_forecast, 'cron', args=[message.chat.id],
+    scheduler.add_job(send_forecast_today, 'cron', args=[message.chat.id],
                       hour=4, minute=30)
     scheduler.add_job(send_holidays, 'cron', args=[message.chat.id], hour=6)
     scheduler.add_job(send_info_polling, 'interval',
@@ -104,6 +110,8 @@ async def start(message: types.Message):
                       args=[message.chat.id], minutes=1, seconds=9)
     scheduler.add_job(send_info_bo_polling, 'interval',
                       args=[message.chat.id], minutes=1, seconds=12)
+    scheduler.add_job(send_forecast_tomorrow, 'cron', args=[message.chat.id],
+                      hour=18)
 
 
 def register(dp: Dispatcher):

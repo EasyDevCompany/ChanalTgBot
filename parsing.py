@@ -42,7 +42,7 @@ def get_urgent_information():
     return urgent_news
 
 
-def get_weather():
+def get_weather_today():
     url = os.getenv('WEATHER')
     forecast_list = []
     try:
@@ -58,6 +58,32 @@ def get_weather():
         today = int(datetime.datetime.now().strftime('%d'))
         for i in result['list']:
             if int(i['dt_txt'][8:10]) == today:
+                forecast = (
+                    i['dt_txt'] + '{0:+3.0f} '.format(i['main']['temp'])
+                    + i['weather'][0]['description']
+                    )
+                forecast_list.append(forecast)
+    except Exception as e:
+        forecast_list.append("Exception (forecast):", e)
+    return forecast_list
+
+
+def get_weather_tomorrow():
+    url = os.getenv('WEATHER')
+    forecast_list = []
+    try:
+        response = requests.get(
+            url,
+            params={
+                'id': 571476,
+                'lang': 'ru',
+                'units': 'metric',
+                'APPID': os.getenv('WEATHER_API_KEY')
+                }, headers=headers)
+        result = response.json()
+        today = int(datetime.datetime.now().strftime('%d'))
+        for i in result['list']:
+            if int(i['dt_txt'][8:10]) - today == 1:
                 forecast = (
                     i['dt_txt'] + '{0:+3.0f} '.format(i['main']['temp'])
                     + i['weather'][0]['description']
