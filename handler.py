@@ -2,7 +2,9 @@ from create_bot import bot
 from aiogram import Dispatcher, types
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from parsing import (get_urgent_information, get_horoscope, get_weather,
-                     get_holidays)
+                     get_holidays, check_update_urgent_information,
+                     check_update_newbryansk, check_update_ria,
+                     check_update_bga, check_update_bo)
 
 
 scheduler = AsyncIOScheduler(timezone='UTC')
@@ -35,6 +37,51 @@ async def send_holidays(id):
         await bot.send_message(id, holiday)
 
 
+async def send_info_polling(id):
+    thing = check_update_urgent_information()
+    if thing is not None:
+        await bot.send_message(
+            id,
+            f'{list(thing.keys())[0]}\n\n{list(thing.values())[0]}',
+            parse_mode='HTML')
+
+
+async def send_info_newbryansk_polling(id):
+    thing = check_update_newbryansk()
+    if thing is not None:
+        await bot.send_message(
+            id,
+            f'{list(thing.keys())[0]}\n\n{list(thing.values())[0]}',
+            parse_mode='HTML')
+
+
+async def send_info_ria_polling(id):
+    thing = check_update_ria()
+    if thing is not None:
+        await bot.send_message(
+            id,
+            f'{list(thing.keys())[0]}\n\n{list(thing.values())[0]}',
+            parse_mode='HTML')
+
+
+async def send_info_bga_polling(id):
+    thing = check_update_bga()
+    if thing is not None:
+        await bot.send_message(
+            id,
+            f'{list(thing.keys())[0]}\n\n{list(thing.values())[0]}',
+            parse_mode='HTML')
+
+
+async def send_info_bo_polling(id):
+    thing = check_update_bo()
+    if thing is not None:
+        await bot.send_message(
+            id,
+            f'{list(thing.keys())[0]}\n\n{list(thing.values())[0]}',
+            parse_mode='HTML')
+
+
 async def start(message: types.Message):
     bot_obj = await bot.get_me()
     bot_id = bot_obj.id
@@ -47,6 +94,16 @@ async def start(message: types.Message):
     scheduler.add_job(send_forecast, 'cron', args=[message.chat.id],
                       hour=4, minute=30)
     scheduler.add_job(send_holidays, 'cron', args=[message.chat.id], hour=6)
+    scheduler.add_job(send_info_polling, 'interval',
+                      args=[message.chat.id], minutes=1)
+    scheduler.add_job(send_info_newbryansk_polling, 'interval',
+                      args=[message.chat.id], minutes=1, seconds=3)
+    scheduler.add_job(send_info_ria_polling, 'interval',
+                      args=[message.chat.id], minutes=1, seconds=6)
+    scheduler.add_job(send_info_bga_polling, 'interval',
+                      args=[message.chat.id], minutes=1, seconds=9)
+    scheduler.add_job(send_info_bo_polling, 'interval',
+                      args=[message.chat.id], minutes=1, seconds=12)
 
 
 def register(dp: Dispatcher):

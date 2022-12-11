@@ -13,10 +13,15 @@ headers = {
     'user-agent': str(ua.chrome)
 }
 
+last_urgent = None
+last_newbryansk = None
+last_ria = None
+last_bga = None
+last_bo = None
+
 
 def get_urgent_information():
-    url = ('https://32.mchs.gov.ru/deyatelnost/press-centr/'
-           'operativnaya-informaciya')
+    url = os.getenv('MCHS')
     urgent_news = {}
     try:
         response = requests.get(url, headers=headers)
@@ -38,10 +43,11 @@ def get_urgent_information():
 
 
 def get_weather():
+    url = os.getenv('WEATHER')
     forecast_list = []
     try:
         response = requests.get(
-            'https://api.openweathermap.org/data/2.5/forecast',
+            url,
             params={
                 'id': 571476,
                 'lang': 'ru',
@@ -95,9 +101,10 @@ def get_horoscope():
 
 
 def get_holidays():
+    url = os.getenv('HOLY')
     holidays = []
     try:
-        response = requests.get('https://my-calend.ru/holidays',
+        response = requests.get(url,
                                 headers=headers)
         result = response.content
         soup = BeautifulSoup(result, 'lxml')
@@ -108,3 +115,163 @@ def get_holidays():
     except Exception as e:
         holidays.append(f'Error {e}')
     return holidays
+
+
+def get_urgent_information_polling():
+    url = os.getenv('MCHS')
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        things_dict = {}
+        thing = soup.find(
+            'div', class_='articles-item').find(
+                'a', class_='articles-item__title').text
+        thing_href = soup.find(
+            'div', class_='articles-item').find(
+                'a', class_='articles-item__title').get('href')
+        things_dict[thing] = 'https://32.mchs.gov.ru' + thing_href
+    except Exception as e:
+        things_dict['Error'] = f'Произошла ошибка - {e}'
+    return things_dict
+
+
+def check_update_urgent_information():
+    global last_urgent
+    data = get_urgent_information_polling()
+    if last_urgent == data:
+        return None
+    else:
+        last_urgent = data
+        return last_urgent
+
+
+def get_info_from_newbryansk():
+    url = os.getenv('NEWBR')
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        news_dict = {}
+        new_title = soup.find('section',
+                              class_='feed'
+                              ).find('div').find('a', class_='post-title').text
+        new_href = soup.find('section',
+                             class_='feed'
+                             ).find('div').find(
+                                 'a', class_='post-title').get('href')
+        news_dict[new_title] = url + new_href
+    except Exception as e:
+        news_dict['Error'] = f'Произошла ошибка - {e}'
+    return news_dict
+
+
+def check_update_newbryansk():
+    global last_newbryansk
+    data = get_info_from_newbryansk()
+    if last_newbryansk == data:
+        return None
+    else:
+        last_newbryansk = data
+        return last_newbryansk
+
+
+def get_info_from_ria():
+    url = os.getenv('RIA')
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        news_dict = {}
+        new_title = soup.find(
+            'div', class_='list list-tags'
+            ).find('div', class_='list-item'
+                   ).find('div', class_='list-item__content'
+                          ).find('a',
+                                 class_=('list-item__title '
+                                         'color-font-hover-only')).text
+        new_href = soup.find(
+            'div', class_='list list-tags'
+            ).find('div', class_='list-item'
+                   ).find('div', class_='list-item__content'
+                          ).find('a',
+                                 class_=('list-item__title '
+                                         'color-font-hover-only')).get('href')
+        news_dict[new_title] = new_href
+    except Exception as e:
+        news_dict['Error'] = f'Произошла ошибка - {e}'
+    return news_dict
+
+
+def check_update_ria():
+    global last_ria
+    data = get_info_from_ria()
+    if last_ria == data:
+        return None
+    else:
+        last_ria = data
+        return last_ria
+
+
+def get_info_from_bga():
+    url = os.getenv('BGA')
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        news_dict = {}
+        new_title = soup.find(
+            'div', class_='c9'
+            ).find('div', class_='oneNewsBlock'
+                   ).find('a').get('title')
+        new_href = soup.find(
+            'div', class_='c9'
+            ).find('div', class_='oneNewsBlock'
+                   ).find('a').get('href')
+        news_dict[new_title] = new_href
+    except Exception as e:
+        news_dict['Error'] = f'Произошла ошибка - {e}'
+    return news_dict
+
+
+def check_update_bga():
+    global last_bga
+    data = get_info_from_bga()
+    if last_bga == data:
+        return None
+    else:
+        last_bga = data
+        return last_bga
+
+
+def get_info_from_bryanskobl():
+    url = os.getenv('BO')
+    try:
+        response = requests.get(url, headers=headers)
+        result = response.content
+        soup = BeautifulSoup(result, 'lxml')
+        news_dict = {}
+        new_title = soup.find(
+            'div', class_='grid_12'
+            ).find('div', class_='grid_10 omega'
+                   ).find('div', class_='news-header-item'
+                          ).find('a').text
+        new_href = soup.find(
+            'div', class_='grid_12'
+            ).find('div', class_='grid_10 omega'
+                   ).find('div', class_='news-header-item'
+                          ).find('a').get('href')
+        news_dict[new_title] = 'http://www.bryanskobl.ru' + new_href
+    except Exception as e:
+        news_dict['Error'] = f'Произошла ошибка - {e}'
+    return news_dict
+
+
+def check_update_bo():
+    global last_bo
+    data = get_info_from_bryanskobl()
+    if last_bo == data:
+        return None
+    else:
+        last_bo = data
+        return last_bo
