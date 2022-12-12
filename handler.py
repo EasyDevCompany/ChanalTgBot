@@ -2,9 +2,10 @@ from create_bot import bot
 from aiogram import Dispatcher, types
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from parsing import (get_urgent_information, get_horoscope, get_weather_today,
-                     get_holidays, check_update_urgent_information,
-                     check_update_newbryansk, check_update_ria,
-                     check_update_bga, check_update_bo, get_weather_tomorrow)
+                     get_holidays, get_urgent_information_polling,
+                     get_weather_tomorrow, get_info_from_bga,
+                     get_info_from_bryanskobl, get_info_from_newbryansk,
+                     get_info_from_ria)
 
 
 scheduler = AsyncIOScheduler(timezone='UTC')
@@ -44,7 +45,7 @@ async def send_holidays(id):
 
 
 async def send_info_polling(id):
-    thing = check_update_urgent_information()
+    thing = get_urgent_information_polling()
     if thing is not None:
         await bot.send_message(
             id,
@@ -53,7 +54,7 @@ async def send_info_polling(id):
 
 
 async def send_info_newbryansk_polling(id):
-    thing = check_update_newbryansk()
+    thing = get_info_from_newbryansk()
     if thing is not None:
         await bot.send_message(
             id,
@@ -62,7 +63,7 @@ async def send_info_newbryansk_polling(id):
 
 
 async def send_info_ria_polling(id):
-    thing = check_update_ria()
+    thing = get_info_from_ria()
     if thing is not None:
         await bot.send_message(
             id,
@@ -71,7 +72,7 @@ async def send_info_ria_polling(id):
 
 
 async def send_info_bga_polling(id):
-    thing = check_update_bga()
+    thing = get_info_from_bga()
     if thing is not None:
         await bot.send_message(
             id,
@@ -80,7 +81,7 @@ async def send_info_bga_polling(id):
 
 
 async def send_info_bo_polling(id):
-    thing = check_update_bo()
+    thing = get_info_from_bryanskobl()
     if thing is not None:
         await bot.send_message(
             id,

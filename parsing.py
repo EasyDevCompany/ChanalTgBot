@@ -1,5 +1,6 @@
 import os
-import requests
+import httpx
+import redis
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import datetime
@@ -13,19 +14,15 @@ headers = {
     'user-agent': str(ua.chrome)
 }
 
-last_urgent = None
-last_newbryansk = None
-last_ria = None
-last_bga = None
-last_bo = None
+redis = redis.Redis('localhost', 6379, 0)
 
 
 def get_urgent_information():
     url = os.getenv('MCHS')
     urgent_news = {}
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         today = int(datetime.datetime.now().strftime('%d'))
         things_list = soup.find_all('div', class_='articles-item')
@@ -46,7 +43,7 @@ def get_weather_today():
     url = os.getenv('WEATHER')
     forecast_list = []
     try:
-        response = requests.get(
+        response = httpx.get(
             url,
             params={
                 'id': 571476,
@@ -72,7 +69,7 @@ def get_weather_tomorrow():
     url = os.getenv('WEATHER')
     forecast_list = []
     try:
-        response = requests.get(
+        response = httpx.get(
             url,
             params={
                 'id': 571476,
@@ -112,10 +109,10 @@ def get_horoscope():
     }
     for sign in signs.items():
         try:
-            response = requests.get(
+            response = httpx.get(
                 f'https://horo.mail.ru/prediction/{sign[0]}/today/',
                 headers=headers)
-            result = response.content
+            result = response.text
             soup = BeautifulSoup(result, 'lxml')
             horoscope_text = soup.find(
                 'div', class_=('article__item article__item_alignment_left '
@@ -130,9 +127,8 @@ def get_holidays():
     url = os.getenv('HOLY')
     holidays = []
     try:
-        response = requests.get(url,
-                                headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         holidays_list = soup.find('ul', class_='holidays-items').find_all('li')
         for holiday in holidays_list:
@@ -146,8 +142,8 @@ def get_holidays():
 def get_urgent_information_polling():
     url = os.getenv('MCHS')
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         things_dict = {}
         thing = soup.find(
@@ -157,26 +153,25 @@ def get_urgent_information_polling():
             'div', class_='articles-item').find(
                 'a', class_='articles-item__title').get('href')
         things_dict[thing] = 'https://32.mchs.gov.ru' + thing_href
+        try:
+            if redis.get(thing) != thing_href.encode():
+                redis.set(thing, thing_href, datetime.timedelta(days=3))
+                return things_dict
+            else:
+                return None
+        except Exception:
+            redis.set(thing, thing_href, datetime.timedelta(days=3))
+            return things_dict
     except Exception as e:
         things_dict['Error'] = f'Произошла ошибка - {e}'
-    return things_dict
-
-
-def check_update_urgent_information():
-    global last_urgent
-    data = get_urgent_information_polling()
-    if last_urgent == data:
-        return None
-    else:
-        last_urgent = data
-        return last_urgent
+        return things_dict
 
 
 def get_info_from_newbryansk():
     url = os.getenv('NEWBR')
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         news_dict = {}
         new_title = soup.find('section',
@@ -187,26 +182,25 @@ def get_info_from_newbryansk():
                              ).find('div').find(
                                  'a', class_='post-title').get('href')
         news_dict[new_title] = url + new_href
+        try:
+            if redis.get(new_title) != new_href.encode():
+                redis.set(new_title, new_href, datetime.timedelta(days=3))
+                return news_dict
+            else:
+                return None
+        except Exception:
+            redis.set(new_title, new_href, datetime.timedelta(days=3))
+            return news_dict
     except Exception as e:
         news_dict['Error'] = f'Произошла ошибка - {e}'
     return news_dict
 
 
-def check_update_newbryansk():
-    global last_newbryansk
-    data = get_info_from_newbryansk()
-    if last_newbryansk == data:
-        return None
-    else:
-        last_newbryansk = data
-        return last_newbryansk
-
-
 def get_info_from_ria():
     url = os.getenv('RIA')
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         news_dict = {}
         new_title = soup.find(
@@ -224,26 +218,25 @@ def get_info_from_ria():
                                  class_=('list-item__title '
                                          'color-font-hover-only')).get('href')
         news_dict[new_title] = new_href
+        try:
+            if redis.get(new_title) != new_href.encode():
+                redis.set(new_title, new_href, datetime.timedelta(days=1))
+                return news_dict
+            else:
+                return None
+        except Exception:
+            redis.set(new_title, new_href, datetime.timedelta(days=1))
+            return news_dict
     except Exception as e:
         news_dict['Error'] = f'Произошла ошибка - {e}'
     return news_dict
 
 
-def check_update_ria():
-    global last_ria
-    data = get_info_from_ria()
-    if last_ria == data:
-        return None
-    else:
-        last_ria = data
-        return last_ria
-
-
 def get_info_from_bga():
     url = os.getenv('BGA')
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         news_dict = {}
         new_title = soup.find(
@@ -255,26 +248,25 @@ def get_info_from_bga():
             ).find('div', class_='oneNewsBlock'
                    ).find('a').get('href')
         news_dict[new_title] = new_href
+        try:
+            if redis.get(new_title) != new_href.encode():
+                redis.set(new_title, new_href, datetime.timedelta(days=3))
+                return news_dict
+            else:
+                return None
+        except Exception:
+            redis.set(new_title, new_href, datetime.timedelta(days=3))
+            return news_dict
     except Exception as e:
         news_dict['Error'] = f'Произошла ошибка - {e}'
     return news_dict
 
 
-def check_update_bga():
-    global last_bga
-    data = get_info_from_bga()
-    if last_bga == data:
-        return None
-    else:
-        last_bga = data
-        return last_bga
-
-
 def get_info_from_bryanskobl():
     url = os.getenv('BO')
     try:
-        response = requests.get(url, headers=headers)
-        result = response.content
+        response = httpx.get(url, headers=headers)
+        result = response.text
         soup = BeautifulSoup(result, 'lxml')
         news_dict = {}
         new_title = soup.find(
@@ -288,16 +280,15 @@ def get_info_from_bryanskobl():
                    ).find('div', class_='news-header-item'
                           ).find('a').get('href')
         news_dict[new_title] = 'http://www.bryanskobl.ru' + new_href
+        try:
+            if redis.get(new_title) != new_href.encode():
+                redis.set(new_title, new_href, datetime.timedelta(days=3))
+                return news_dict
+            else:
+                return None
+        except Exception:
+            redis.set(new_title, new_href, datetime.timedelta(days=3))
+            return news_dict
     except Exception as e:
         news_dict['Error'] = f'Произошла ошибка - {e}'
     return news_dict
-
-
-def check_update_bo():
-    global last_bo
-    data = get_info_from_bryanskobl()
-    if last_bo == data:
-        return None
-    else:
-        last_bo = data
-        return last_bo
