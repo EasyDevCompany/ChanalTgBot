@@ -5,6 +5,13 @@ from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import datetime
 from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(filename=f'{__name__}.log',
+                    level=logging.INFO,
+                    filemode='w',
+                    encoding='UTF-8')
+
 
 load_dotenv()
 
@@ -134,9 +141,10 @@ def get_holidays():
         for holiday in holidays_list:
             holiday = holiday.text[:-5]
             holidays.append(holiday)
+        return holidays
     except Exception as e:
-        holidays.append(f'Error {e}')
-    return holidays
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
 
 
 def get_urgent_information_polling():
@@ -145,55 +153,77 @@ def get_urgent_information_polling():
         response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        things_dict = {}
-        thing = soup.find(
-            'div', class_='articles-item').find(
-                'a', class_='articles-item__title').text
         thing_href = soup.find(
             'div', class_='articles-item').find(
                 'a', class_='articles-item__title').get('href')
-        things_dict[thing] = 'https://32.mchs.gov.ru' + thing_href
-        try:
-            if redis.get(thing) != thing_href.encode():
-                redis.set(thing, thing_href, datetime.timedelta(days=3))
-                return things_dict
+        response = httpx.get(f'https://32.mchs.gov.ru{thing_href}',
+                             headers=headers)
+        result = response.text
+        soup = BeautifulSoup(result, 'lxml')
+        text = soup.find('div', itemprop='articleBody').find_all('p', limit=3)
+        message = ''
+        for p in text:
+            message += p.text
+        image = soup.find('div', class_='public').find('img').get('src')
+        image_url = 'https://32.mchs.gov.ru' + image
+        if redis.get(message) is not None:
+            if redis.get(message) != image_url.encode():
+                redis.set(message, image_url, datetime.timedelta(days=1))
+                return image_url, message
             else:
                 return None
-        except Exception:
-            redis.set(thing, thing_href, datetime.timedelta(days=3))
-            return things_dict
+        else:
+            logging.info(f'Ключа {message[:10]} не существует.')
+            redis.set(message, image_url, datetime.timedelta(days=1))
+            return image_url, message
     except Exception as e:
-        things_dict['Error'] = f'Произошла ошибка - {e}'
-        return things_dict
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
 
 
 def get_info_from_newbryansk():
     url = os.getenv('NEWBR')
+    today = datetime.datetime.now().strftime('%Y-%m-%d')
+    url_today = url + f'sort_{today}.html'
     try:
-        response = httpx.get(url, headers=headers)
+        response = httpx.get(url_today, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        news_dict = {}
-        new_title = soup.find('section',
-                              class_='feed'
-                              ).find('div').find('a', class_='post-title').text
-        new_href = soup.find('section',
-                             class_='feed'
-                             ).find('div').find(
-                                 'a', class_='post-title').get('href')
-        news_dict[new_title] = url + new_href
         try:
-            if redis.get(new_title) != new_href.encode():
-                redis.set(new_title, new_href, datetime.timedelta(days=3))
-                return news_dict
+            new_href = soup.find('section',
+                                 class_='feed'
+                                 ).find('div').find(
+                                    'a', class_='post-title').get('href')
+            new_href_url = 'https://newsbryansk.ru/' + new_href
+            response = httpx.get(new_href_url, headers=headers)
+            result = response.text
+            soup = BeautifulSoup(result, 'lxml')
+            title = soup.find('div',
+                              class_='col-xs-12 page-container'
+                              ).find('article').find('h1').text
+            text = soup.find('div',
+                             class_='col-xs-12 page-container'
+                             ).find('article').find('div',
+                                                    class_='post-content').text
+            image = soup.find('div',
+                              class_='col-xs-12 page-container'
+                              ).find('img').get('src')
+            message = f'{title}{text}'
+            if redis.get(message) is not None:
+                if redis.get(message) != image.encode():
+                    redis.set(message, image, datetime.timedelta(days=1))
+                    return image, message
+                else:
+                    return None
             else:
-                return None
+                logging.info(f'Ключа {message[:10]} не существует.')
+                redis.set(message, image, datetime.timedelta(days=1))
+                return image, message
         except Exception:
-            redis.set(new_title, new_href, datetime.timedelta(days=3))
-            return news_dict
+            logging.info('Новости ещё не появились')
     except Exception as e:
-        news_dict['Error'] = f'Произошла ошибка - {e}'
-    return news_dict
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
 
 
 def get_info_from_ria():
@@ -202,34 +232,42 @@ def get_info_from_ria():
         response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        news_dict = {}
-        new_title = soup.find(
-            'div', class_='list list-tags'
-            ).find('div', class_='list-item'
-                   ).find('div', class_='list-item__content'
-                          ).find('a',
-                                 class_=('list-item__title '
-                                         'color-font-hover-only')).text
         new_href = soup.find(
             'div', class_='list list-tags'
             ).find('div', class_='list-item'
                    ).find('div', class_='list-item__content'
                           ).find('a',
                                  class_=('list-item__title '
-                                         'color-font-hover-only')).get('href')
-        news_dict[new_title] = new_href
-        try:
-            if redis.get(new_title) != new_href.encode():
-                redis.set(new_title, new_href, datetime.timedelta(days=1))
-                return news_dict
+                                         'color-font-hover-only')
+                                 ).get('href')
+        response = httpx.get(new_href, headers=headers)
+        result = response.text
+        soup = BeautifulSoup(result, 'lxml')
+        title = soup.find('div', class_='article__title').text
+        text = soup.find_all('div', class_='article__block', limit=2)
+        message = f'{title}\n\n'
+        for p in text:
+            try:
+                abzac = p.find('div', class_='article__text').text
+                message += abzac + '\n\n'
+            except Exception:
+                abzac = p.find('div',
+                               class_='article__quote-text m-small').text
+                message += abzac
+        image = soup.find('div', class_='media').find('img').get('src')
+        if redis.get(image) is not None:
+            if image.encode() not in redis.keys():
+                redis.set(image, message, datetime.timedelta(hours=6))
+                return image, message
             else:
                 return None
-        except Exception:
-            redis.set(new_title, new_href, datetime.timedelta(days=1))
-            return news_dict
+        else:
+            logging.info(f'Ключа {image} не существует.')
+            redis.set(image, message, datetime.timedelta(hours=6))
+            return image, message
     except Exception as e:
-        news_dict['Error'] = f'Произошла ошибка - {e}'
-    return news_dict
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
 
 
 def get_info_from_bga():
@@ -238,7 +276,6 @@ def get_info_from_bga():
         response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        news_dict = {}
         new_title = soup.find(
             'div', class_='c9'
             ).find('div', class_='oneNewsBlock'
@@ -247,19 +284,30 @@ def get_info_from_bga():
             'div', class_='c9'
             ).find('div', class_='oneNewsBlock'
                    ).find('a').get('href')
-        news_dict[new_title] = new_href
-        try:
-            if redis.get(new_title) != new_href.encode():
-                redis.set(new_title, new_href, datetime.timedelta(days=3))
-                return news_dict
+        image = soup.find(
+            'div', class_='c9'
+            ).find('div', class_='oneNewsBlock'
+                   ).find('img').get('src')
+        response = httpx.get(new_href, headers=headers)
+        result = response.text
+        soup = BeautifulSoup(result, 'lxml')
+        message = f'{new_title}\n\n'
+        text = soup.find('div', class_='c9').find_all(['h2', 'p'], limit=5)
+        for p in text:
+            message += p.text
+        if redis.get(message) is not None:
+            if redis.get(message) != image.encode():
+                redis.set(message, image, datetime.timedelta(hours=6))
+                return image, message
             else:
                 return None
-        except Exception:
-            redis.set(new_title, new_href, datetime.timedelta(days=3))
-            return news_dict
+        else:
+            logging.info(f'Ключа {message[:10]} не существует.')
+            redis.set(message, image, datetime.timedelta(hours=6))
+            return image, message
     except Exception as e:
-        news_dict['Error'] = f'Произошла ошибка - {e}'
-    return news_dict
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
 
 
 def get_info_from_bryanskobl():
@@ -268,7 +316,6 @@ def get_info_from_bryanskobl():
         response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        news_dict = {}
         new_title = soup.find(
             'div', class_='grid_12'
             ).find('div', class_='grid_10 omega'
@@ -279,16 +326,33 @@ def get_info_from_bryanskobl():
             ).find('div', class_='grid_10 omega'
                    ).find('div', class_='news-header-item'
                           ).find('a').get('href')
-        news_dict[new_title] = 'http://www.bryanskobl.ru' + new_href
         try:
-            if redis.get(new_title) != new_href.encode():
-                redis.set(new_title, new_href, datetime.timedelta(days=3))
-                return news_dict
+            image = soup.find(
+                'div', class_='grid_12'
+                ).find('div', class_='grid_2 alpha news-image-item'
+                       ).find('img').get('src')
+        except Exception:
+            image = None
+        new_href_url = 'http://www.bryanskobl.ru' + new_href
+        response = httpx.get(new_href_url, headers=headers)
+        result = response.text
+        soup = BeautifulSoup(result, 'lxml')
+        text = soup.find('div', class_='grid_12'
+                         ).find('div',
+                                class_='news-content').find_all('p', limit=3)
+        message = f'{new_title}'
+        for p in text:
+            message += p.text
+        if redis.get(message) is not None:
+            if redis.get(message) != new_title.encode():
+                redis.set(message, new_title, datetime.timedelta(hours=6))
+                return image, message
             else:
                 return None
-        except Exception:
-            redis.set(new_title, new_href, datetime.timedelta(days=3))
-            return news_dict
+        else:
+            logging.info(f'Ключа {message[:10]} не существует.')
+            redis.set(message, new_title, datetime.timedelta(hours=6))
+            return image, message
     except Exception as e:
-        news_dict['Error'] = f'Произошла ошибка - {e}'
-    return news_dict
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
