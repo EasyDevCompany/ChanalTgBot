@@ -21,7 +21,7 @@ headers = {
     'user-agent': str(ua.chrome)
 }
 
-redis = redis.Redis('localhost', 6379, 0)
+redis = redis.Redis('redis_server', 6379, 0)
 
 
 def get_urgent_information():
