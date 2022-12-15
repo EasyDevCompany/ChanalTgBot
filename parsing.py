@@ -41,9 +41,10 @@ def get_urgent_information():
                 thing_href = 'https://32.mchs.gov.ru' + thing.find(
                     'a', class_='articles-item__title').get('href')
                 urgent_news[thing_title] = thing_href
+                return urgent_news
     except Exception as e:
-        urgent_news['Exception (urgent news):'] = e
-    return urgent_news
+        logging.error('Нет ответа от сервера')
+        logging.error(e)
 
 
 def get_weather_today():
@@ -67,9 +68,10 @@ def get_weather_today():
                     + i['weather'][0]['description']
                     )
                 forecast_list.append(forecast)
+                return forecast_list
     except Exception as e:
-        forecast_list.append("Exception (forecast):", e)
-    return forecast_list
+        logging.error("Сайт недоступен")
+        logging.error(e)
 
 
 def get_weather_tomorrow():
@@ -93,9 +95,10 @@ def get_weather_tomorrow():
                     + i['weather'][0]['description']
                     )
                 forecast_list.append(forecast)
+                return forecast_list
     except Exception as e:
-        forecast_list.append("Exception (forecast):", e)
-    return forecast_list
+        logging.error("Сайт недоступен")
+        logging.error(e)
 
 
 def get_horoscope():
@@ -168,13 +171,13 @@ def get_urgent_information_polling():
         image_url = 'https://32.mchs.gov.ru' + image
         if redis.get(message) is not None:
             if redis.get(message) != image_url.encode():
-                redis.set(message, image_url, datetime.timedelta(days=1))
+                redis.set(message, image_url, datetime.timedelta(days=2))
                 return image_url, message
             else:
                 return None
         else:
             logging.info(f'Ключа {message[:10]} не существует.')
-            redis.set(message, image_url, datetime.timedelta(days=1))
+            redis.set(message, image_url, datetime.timedelta(days=2))
             return image_url, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
@@ -183,10 +186,8 @@ def get_urgent_information_polling():
 
 def get_info_from_newbryansk():
     url = os.getenv('NEWBR')
-    today = datetime.datetime.now().strftime('%Y-%m-%d')
-    url_today = url + f'sort_{today}.html'
     try:
-        response = httpx.get(url_today, headers=headers)
+        response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
         try:
@@ -205,19 +206,20 @@ def get_info_from_newbryansk():
                              class_='col-xs-12 page-container'
                              ).find('article').find('div',
                                                     class_='post-content').text
+            text = (text[:900] + '...') if len(text) > 900 else text
             image = soup.find('div',
                               class_='col-xs-12 page-container'
                               ).find('img').get('src')
             message = f'{title}{text}'
             if redis.get(message) is not None:
                 if redis.get(message) != image.encode():
-                    redis.set(message, image, datetime.timedelta(days=1))
+                    redis.set(message, image, datetime.timedelta(days=2))
                     return image, message
                 else:
                     return None
             else:
                 logging.info(f'Ключа {message[:10]} не существует.')
-                redis.set(message, image, datetime.timedelta(days=1))
+                redis.set(message, image, datetime.timedelta(days=2))
                 return image, message
         except Exception:
             logging.info('Новости ещё не появились')
@@ -257,13 +259,13 @@ def get_info_from_ria():
         image = soup.find('div', class_='media').find('img').get('src')
         if redis.get(image) is not None:
             if image.encode() not in redis.keys():
-                redis.set(image, message, datetime.timedelta(hours=6))
+                redis.set(image, message, datetime.timedelta(days=2))
                 return image, message
             else:
                 return None
         else:
             logging.info(f'Ключа {image} не существует.')
-            redis.set(image, message, datetime.timedelta(hours=6))
+            redis.set(image, message, datetime.timedelta(days=2))
             return image, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
@@ -297,13 +299,13 @@ def get_info_from_bga():
             message += p.text
         if redis.get(message) is not None:
             if redis.get(message) != image.encode():
-                redis.set(message, image, datetime.timedelta(hours=6))
+                redis.set(message, image, datetime.timedelta(days=2))
                 return image, message
             else:
                 return None
         else:
             logging.info(f'Ключа {message[:10]} не существует.')
-            redis.set(message, image, datetime.timedelta(hours=6))
+            redis.set(message, image, datetime.timedelta(days=2))
             return image, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
@@ -345,13 +347,13 @@ def get_info_from_bryanskobl():
             message += p.text
         if redis.get(message) is not None:
             if redis.get(message) != new_title.encode():
-                redis.set(message, new_title, datetime.timedelta(hours=6))
+                redis.set(message, new_title, datetime.timedelta(days=2))
                 return image, message
             else:
                 return None
         else:
             logging.info(f'Ключа {message[:10]} не существует.')
-            redis.set(message, new_title, datetime.timedelta(hours=6))
+            redis.set(message, new_title, datetime.timedelta(days=2))
             return image, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")

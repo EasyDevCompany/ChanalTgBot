@@ -67,7 +67,9 @@ async def send_info_polling(id):
     thing = get_urgent_information_polling()
     if thing is not None:
         try:
-            await bot.send_photo(id, thing[0], caption=thing[1], parse_mode='HTML')
+            await bot.send_photo(id, thing[0],
+                                 caption=thing[1],
+                                 parse_mode='HTML')
         except Exception as e:
             await bot.send_message(id, thing[1], parse_mode='HTML')
             logging.error('Невозможно прикрепить картинку')
