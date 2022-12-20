@@ -2,9 +2,10 @@ import asyncio
 
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import DEFAULT_RATE_LIMIT
-from aiogram.dispatcher.handler import current_handler
+from aiogram.dispatcher.handler import current_handler, CancelHandler
 from aiogram.dispatcher.middlewares import BaseMiddleware
 from aiogram.utils.exceptions import Throttled
+from aiogram.types import MessageEntityType
 
 
 class ThrottlingMiddleware(BaseMiddleware):
@@ -62,3 +63,14 @@ class ThrottlingMiddleware(BaseMiddleware):
 
         # Sleep.
         await asyncio.sleep(delta)
+
+
+# If the message contains a URL, delete the message and cancel the handler
+class UrlMiddleWare(BaseMiddleware):
+    async def on_pre_process_message(self, message: types.Message, data: dict):
+        if msg_entities := (message.entities or message.caption_entities):
+            for entitie in msg_entities:
+                if entitie.type in [MessageEntityType.URL,
+                                    MessageEntityType.TEXT_LINK]:
+                    await message.delete()
+                    raise CancelHandler()
