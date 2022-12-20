@@ -1,10 +1,13 @@
 from aiogram import executor
+
 import handler
 from create_bot import dp
 
 
 async def start(_):
     print('Бот запущен')
+    import middlewares
+    middlewares.setup(dp)
 
 
 handler.register(dp)

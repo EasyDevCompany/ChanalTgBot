@@ -7,6 +7,7 @@ import datetime
 from dotenv import load_dotenv
 import logging
 
+
 logging.basicConfig(filename=f'{__name__}.log',
                     level=logging.INFO,
                     filemode='w',
@@ -25,6 +26,13 @@ redis = redis.Redis('redis_server', 6379, 0)
 
 
 def get_urgent_information():
+    """
+    It gets the latest news from the website of the Ministry of Emergency
+    Situations of Russia
+    :return: A dictionary with the title of the news
+    as the key and the link to the
+    news as the value.
+    """
     url = os.getenv('MCHS')
     urgent_news = {}
     try:
@@ -41,42 +49,21 @@ def get_urgent_information():
                 thing_href = 'https://32.mchs.gov.ru' + thing.find(
                     'a', class_='articles-item__title').get('href')
                 urgent_news[thing_title] = thing_href
-                return urgent_news
+        return urgent_news
     except Exception as e:
         logging.error('Нет ответа от сервера')
         logging.error(e)
 
 
-def get_weather_today():
+def get_weather():
+    """
+    It gets the weather forecast for today and tomorrow from an API and
+    returns it in a dictionary.
+    :return: A dictionary with two keys: today and tomorrow.
+    """
     url = os.getenv('WEATHER')
-    forecast_list = []
-    try:
-        response = httpx.get(
-            url,
-            params={
-                'id': 571476,
-                'lang': 'ru',
-                'units': 'metric',
-                'APPID': os.getenv('WEATHER_API_KEY')
-                }, headers=headers)
-        result = response.json()
-        today = int(datetime.datetime.now().strftime('%d'))
-        for i in result['list']:
-            if int(i['dt_txt'][8:10]) == today:
-                forecast = (
-                    i['dt_txt'] + '{0:+3.0f} '.format(i['main']['temp'])
-                    + i['weather'][0]['description']
-                    )
-                forecast_list.append(forecast)
-                return forecast_list
-    except Exception as e:
-        logging.error("Сайт недоступен")
-        logging.error(e)
-
-
-def get_weather_tomorrow():
-    url = os.getenv('WEATHER')
-    forecast_list = []
+    forecast_dict = {'today': {},
+                     'tomorrow': {}}
     try:
         response = httpx.get(
             url,
@@ -91,31 +78,70 @@ def get_weather_tomorrow():
         for i in result['list']:
             if int(i['dt_txt'][8:10]) - today == 1:
                 forecast = (
-                    i['dt_txt'] + '{0:+3.0f} '.format(i['main']['temp'])
+                    i['dt_txt'][11:] + '{0:+3.0f} '.format(i['main']['temp'])
                     + i['weather'][0]['description']
                     )
-                forecast_list.append(forecast)
-                return forecast_list
+                if i['weather'][0]['id'] == 803:
+                    forecast_dict['tomorrow'][forecast] = (
+                                            'images/облачно с прояснением.png')
+                elif i['weather'][0]['main'] == 'Snow':
+                    forecast_dict['tomorrow'][forecast] = 'images/снег.png'
+                elif i['weather'][0]['main'] == 'Rain':
+                    forecast_dict['tomorrow'][forecast] = 'images/дождь.png'
+                elif i['weather'][0]['main'] == 'Clear':
+                    forecast_dict['tomorrow'][forecast] = 'images/ясно.png'
+                elif i['weather'][0]['main'] == 'Thunderstorm':
+                    forecast_dict['tomorrow'][forecast] = (
+                        'images/дождь с гроза.png')
+                elif i['weather'][0]['main'] == 'Clouds':
+                    forecast_dict['tomorrow'][forecast] = 'images/облачно.png'
+            elif int(i['dt_txt'][8:10]) == today:
+                forecast = (
+                    i['dt_txt'][11:] + '{0:+3.0f} '.format(i['main']['temp'])
+                    + i['weather'][0]['description']
+                    )
+                if i['weather'][0]['id'] == 803:
+                    forecast_dict['today'][forecast] = (
+                                            'images/облачно с прояснением.png')
+                elif i['weather'][0]['main'] == 'Snow':
+                    forecast_dict['today'][forecast] = 'images/снег.png'
+                elif i['weather'][0]['main'] == 'Rain':
+                    forecast_dict['today'][forecast] = 'images/дождь.png'
+                elif i['weather'][0]['main'] == 'Clear':
+                    forecast_dict['today'][forecast] = 'images/ясно.png'
+                elif i['weather'][0]['main'] == 'Thunderstorm':
+                    forecast_dict['today'][forecast] = (
+                        'images/дождь с гроза.png')
+                elif i['weather'][0]['main'] == 'Clouds':
+                    forecast_dict['today'][forecast] = 'images/облачно.png'
+        return forecast_dict
     except Exception as e:
         logging.error("Сайт недоступен")
         logging.error(e)
 
 
 def get_horoscope():
+    """
+    It gets the horoscope for each sign from the website and returns a
+    dictionary with the sign name as the key and the horoscope text and
+    image path as the value.
+    :return: A dictionary with the name of the sign as the key and a tuple as
+    the value. The tuple contains the horoscope text and the image path.
+    """
     horoscope = {}
     signs = {
-        'aries': 'Овен',
-        'taurus': 'Телец',
-        'gemini': 'Близнецы',
-        'cancer': 'Рак',
-        'leo': 'Лев',
-        'virgo': 'Дева',
-        'libra': 'Весы',
-        'scorpio': 'Скорпион',
-        'sagittarius': 'Стрелец',
-        'capricorn': 'Козерог',
-        'aquarius': 'Водолей',
-        'pisces': 'Рыбы',
+        'aries': ['Овен', 'images/овен.png'],
+        'taurus': ['Телец', 'images/Телец.png'],
+        'gemini': ['Близнецы', 'images/блезнецы.png'],
+        'cancer': ['Рак', 'images/рак.png'],
+        'leo': ['Лев', 'images/лев.png'],
+        'virgo': ['Дева', 'images/дева.png'],
+        'libra': ['Весы', 'images/весы.png'],
+        'scorpio': ['Скорпион', 'images/скорпион.png'],
+        'sagittarius': ['Стрелец', 'images/стрелец.png'],
+        'capricorn': ['Козерог', 'images/козерог.png'],
+        'aquarius': ['Водолей', 'images/водолей.png'],
+        'pisces': ['Рыбы', 'images/рыбы.png'],
     }
     for sign in signs.items():
         try:
@@ -127,13 +153,18 @@ def get_horoscope():
             horoscope_text = soup.find(
                 'div', class_=('article__item article__item_alignment_left '
                                'article__item_html')).text
-            horoscope[sign[1]] = horoscope_text
+            horoscope[sign[1][0]] = horoscope_text, sign[1][1]
         except Exception as e:
             horoscope['Exception horoscope'] = e
     return horoscope
 
 
 def get_holidays():
+    """
+    It takes a url, makes a request to that url, parses the response, and
+    returns a list of holidays
+    :return: A list of holidays
+    """
     url = os.getenv('HOLY')
     holidays = []
     try:
@@ -151,11 +182,17 @@ def get_holidays():
 
 
 def get_urgent_information_polling():
+    """
+    It gets the latest news from the site, checks if it's already in the
+    database, if not, it adds it to the database and returns the message.
+    :return: a message.
+    """
     url = os.getenv('MCHS')
     try:
         response = httpx.get(url, headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
+        title = soup.find('a', class_='articles-item__title').text
         thing_href = soup.find(
             'div', class_='articles-item').find(
                 'a', class_='articles-item__title').get('href')
@@ -163,8 +200,8 @@ def get_urgent_information_polling():
                              headers=headers)
         result = response.text
         soup = BeautifulSoup(result, 'lxml')
-        text = soup.find('div', itemprop='articleBody').find_all('p', limit=3)
-        message = ''
+        text = soup.find('div', itemprop='articleBody').find_all('p', limit=15)
+        message = f'{title}\n\n'
         for p in text:
             message += p.text
         image = soup.find('div', class_='public').find('img').get('src')
@@ -172,19 +209,25 @@ def get_urgent_information_polling():
         if redis.get(message) is not None:
             if redis.get(message) != image_url.encode():
                 redis.set(message, image_url, datetime.timedelta(days=2))
-                return image_url, message
+                return message
             else:
                 return None
         else:
             logging.info(f'Ключа {message[:10]} не существует.')
             redis.set(message, image_url, datetime.timedelta(days=2))
-            return image_url, message
+            return message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
         logging.error(e)
 
 
 def get_info_from_newbryansk():
+    """
+    It gets the latest news from the site, checks if the image is in the redis
+    database, if not, it adds it to the database and returns the image and the
+    text of the news.
+    :return: a tuple of two elements.
+    """
     url = os.getenv('NEWBR')
     try:
         response = httpx.get(url, headers=headers)
@@ -204,22 +247,22 @@ def get_info_from_newbryansk():
                               ).find('article').find('h1').text
             text = soup.find('div',
                              class_='col-xs-12 page-container'
-                             ).find('article').find('div',
-                                                    class_='post-content').text
-            text = (text[:900] + '...') if len(text) > 900 else text
+                             ).find('article').find_all('p', limit=6)
             image = soup.find('div',
                               class_='col-xs-12 page-container'
                               ).find('img').get('src')
-            message = f'{title}{text}'
-            if redis.get(message) is not None:
-                if redis.get(message) != image.encode():
-                    redis.set(message, image, datetime.timedelta(days=2))
+            message = f'{title}\n\n'
+            for p in text:
+                message += p.text
+            if redis.get(image) is not None:
+                if image.encode() not in redis.keys():
+                    redis.set(image, message, datetime.timedelta(days=2))
                     return image, message
                 else:
                     return None
             else:
-                logging.info(f'Ключа {message[:10]} не существует.')
-                redis.set(message, image, datetime.timedelta(days=2))
+                logging.info(f'Ключа {image} не существует.')
+                redis.set(image, message, datetime.timedelta(days=2))
                 return image, message
         except Exception:
             logging.info('Новости ещё не появились')
@@ -229,6 +272,11 @@ def get_info_from_newbryansk():
 
 
 def get_info_from_ria():
+    """
+    It gets the latest news from the site, parses it, and returns the image and
+    text of the news
+    :return: a tuple of two elements: image and message.
+    """
     url = os.getenv('RIA')
     try:
         response = httpx.get(url, headers=headers)
@@ -273,6 +321,11 @@ def get_info_from_ria():
 
 
 def get_info_from_bga():
+    """
+    It gets the latest news from the site, parses it, and returns the image and
+    text of the news
+    :return: a tuple of two elements: image and message.
+    """
     url = os.getenv('BGA')
     try:
         response = httpx.get(url, headers=headers)
@@ -297,15 +350,15 @@ def get_info_from_bga():
         text = soup.find('div', class_='c9').find_all(['h2', 'p'], limit=5)
         for p in text:
             message += p.text
-        if redis.get(message) is not None:
-            if redis.get(message) != image.encode():
-                redis.set(message, image, datetime.timedelta(days=2))
+        if redis.get(image) is not None:
+            if image.encode() not in redis.keys():
+                redis.set(image, message, datetime.timedelta(days=2))
                 return image, message
             else:
                 return None
         else:
-            logging.info(f'Ключа {message[:10]} не существует.')
-            redis.set(message, image, datetime.timedelta(days=2))
+            logging.info(f'Ключа {image} не существует.')
+            redis.set(image, message, datetime.timedelta(days=2))
             return image, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
@@ -328,13 +381,6 @@ def get_info_from_bryanskobl():
             ).find('div', class_='grid_10 omega'
                    ).find('div', class_='news-header-item'
                           ).find('a').get('href')
-        try:
-            image = soup.find(
-                'div', class_='grid_12'
-                ).find('div', class_='grid_2 alpha news-image-item'
-                       ).find('img').get('src')
-        except Exception:
-            image = None
         new_href_url = 'http://www.bryanskobl.ru' + new_href
         response = httpx.get(new_href_url, headers=headers)
         result = response.text
@@ -342,19 +388,118 @@ def get_info_from_bryanskobl():
         text = soup.find('div', class_='grid_12'
                          ).find('div',
                                 class_='news-content').find_all('p', limit=3)
-        message = f'{new_title}'
+        try:
+            image = 'http://www.bryanskobl.ru' + soup.find(
+                    'div', class_='grid_12'
+                    ).find('div', class_='grid_8 alpha photo-container'
+                           ).find('img', class_='image-border').get('src')
+        except Exception:
+            image = None
+        message = f'{new_title}\n\n'
         for p in text:
             message += p.text
-        if redis.get(message) is not None:
-            if redis.get(message) != new_title.encode():
-                redis.set(message, new_title, datetime.timedelta(days=2))
+        if redis.get(image) is not None:
+            if image.encode() not in redis.keys():
+                redis.set(image, message, datetime.timedelta(days=2))
                 return image, message
             else:
                 return None
         else:
-            logging.info(f'Ключа {message[:10]} не существует.')
-            redis.set(message, new_title, datetime.timedelta(days=2))
+            logging.info(f'Ключа {image} не существует.')
+            redis.set(image, message, datetime.timedelta(days=2))
             return image, message
     except Exception as e:
         logging.error(f"Сайт {url} недоступен")
         logging.error(e)
+
+
+def get_info_from_gub():
+    url = os.getenv('GUB')
+    try:
+        response = httpx.get(url, headers=headers)
+    except Exception as e:
+        logging.error(f"Сайт {url} недоступен")
+        logging.error(e)
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    article = soup.find('div', class_='article'
+                        ).find('a').get('href')
+    response = httpx.get(article, headers=headers)
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    title = soup.find('div', class_='single_post').find('h1').text
+    image = soup.find('div', class_='thecontent').find('img').get('src')
+    text = soup.find('div', class_='thecontent').find_all('p', limit=2)
+    message = f'{title}\n\n'
+    for p in text:
+        message += p.text + '\n\n'
+    if redis.get(image) is not None:
+        if image.encode() not in redis.keys():
+            redis.set(image, message, datetime.timedelta(days=2))
+            return image, message
+        else:
+            return None
+    else:
+        logging.info(f'Ключа {image} не существует.')
+        redis.set(image, message, datetime.timedelta(days=2))
+        return image, message
+
+
+def get_info_from_brgaz():
+    url = os.getenv('BRGAZ')
+    try:
+        response = httpx.get(url, headers=headers)
+    except Exception:
+        logging.error(f'Сайт {url} недоступен')
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    article = soup.find('div',
+                        class_='col-lg-12 top-cat-news').find('a').get('href')
+    response = httpx.get(article, headers=headers)
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    title = soup.find('h1').text
+    image = soup.find('article').find('img',
+                                      class_='single-top-img').get('src')
+    text = soup.find('div', class_='video-show').find_all('p', limit=2)
+    message = f'{title}\n\n'
+    for p in text:
+        message += p.text + '\n\n'
+    if redis.get(image) is not None:
+        if image.encode() not in redis.keys():
+            redis.set(image, message, datetime.timedelta(days=2))
+            return image, message
+        else:
+            return None
+    else:
+        logging.info(f'Ключа {image} не существует.')
+        redis.set(image, message, datetime.timedelta(days=2))
+        return image, message
+
+
+def get_info_from_bn():
+    url = os.getenv('BN')
+    response = httpx.get(url, headers=headers)
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    article = soup.find('div', class_='loop'
+                        ).find('article').find('a').get('href')
+    response = httpx.get(article, headers=headers)
+    result = response.text
+    soup = BeautifulSoup(result, 'lxml')
+    title = soup.find('h1').text
+    image = soup.find('div', class_='loop').find('img').get('src')
+    text = soup.find('div', class_='entry-content').find_all('p', limit=2)
+    message = f'{title}\n\n'
+    for p in text:
+        message += p.text + '\n\n'
+    if redis.get(image) is not None:
+        if image.encode() not in redis.keys():
+            redis.set(image, message, datetime.timedelta(days=2))
+            return image, message
+        else:
+            return None
+    else:
+        logging.info(f'Ключа {image} не существует.')
+        redis.set(image, message, datetime.timedelta(days=2))
+        return image, message

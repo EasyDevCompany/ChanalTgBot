@@ -131,3 +131,4 @@ dmypy.json
 .vscode
 requests.http
 /redis1.py
+/images
